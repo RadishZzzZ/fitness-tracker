@@ -18,9 +18,16 @@
     return formatDate(date);
   }
 
+  function previousDateString(dateString) {
+    const date = new Date(`${dateString}T12:00:00`);
+    date.setDate(date.getDate() - 1);
+    return formatDate(date);
+  }
+
   app.dateUtils = {
     formatDate,
     todayString,
-    yesterdayString
+    yesterdayString,
+    previousDateString
   };
 })();

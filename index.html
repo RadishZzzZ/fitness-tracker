@@ -3,22 +3,79 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>本地健身记录</title>
+    <title>健身生活 RPG</title>
     <link rel="stylesheet" href="style.css">
   </head>
   <body>
     <header class="app-header">
       <div>
-        <h1>本地健身记录</h1>
-        <p>记录体重、步数、训练和晚饭，数据只保存在本机浏览器。</p>
+        <h1>健身生活 RPG</h1>
+        <p>完成每日任务，积累经验，同时记录训练和生活习惯。</p>
       </div>
     </header>
 
     <main class="app-shell">
+      <section class="panel character-panel" aria-labelledby="character-title">
+        <div class="section-title">
+          <h2 id="character-title">角色状态</h2>
+          <strong id="streakValue" class="streak-value">连续 0 天</strong>
+        </div>
+        <div class="character-grid">
+          <div>
+            <span>等级</span>
+            <strong id="levelValue">Lv. 1</strong>
+          </div>
+          <div>
+            <span>当前经验</span>
+            <strong id="expValue">0 / 100 exp</strong>
+          </div>
+          <div>
+            <span>距离升级</span>
+            <strong id="remainingExpValue">还差 100 exp</strong>
+          </div>
+        </div>
+        <div
+          id="expProgress"
+          class="exp-progress"
+          role="progressbar"
+          aria-label="当前等级经验"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow="0"
+        >
+          <div id="expProgressBar" class="exp-progress-bar"></div>
+        </div>
+        <p id="habitRecommendation" class="habit-recommendation"></p>
+      </section>
+
+      <section class="panel" aria-labelledby="daily-task-title">
+        <div class="section-title">
+          <h2 id="daily-task-title">今日任务</h2>
+          <span id="dailyTaskProgress" class="muted">0 / 5 完成</span>
+        </div>
+        <div id="dailyTaskList" class="daily-task-list"></div>
+        <p id="taskRewardMessage" class="task-reward-message hidden"></p>
+      </section>
+
+      <section class="stats-grid rpg-stats-grid" aria-label="最近7天 RPG 统计">
+        <article class="stat-card">
+          <span>完成任务</span>
+          <strong id="recentTaskCount">0 个</strong>
+        </article>
+        <article class="stat-card">
+          <span>获得经验</span>
+          <strong id="recentExpCount">0 exp</strong>
+        </article>
+        <article class="stat-card">
+          <span>运动任务</span>
+          <strong id="recentExerciseCount">0 次</strong>
+        </article>
+      </section>
+
       <section class="panel advice-panel" aria-labelledby="advice-title">
         <div class="section-title">
           <h2 id="advice-title">今日训练推荐</h2>
-          <button id="clearAllButton" class="danger ghost" type="button">清空全部</button>
+          <button id="clearAllButton" class="danger ghost" type="button">清空健身记录</button>
         </div>
         <div class="recommendation-card">
           <div>
@@ -100,9 +157,9 @@
             <input id="steps" type="number" min="0" step="1" placeholder="例如 8500" required>
           </label>
 
-          <label class="checkbox-row">
-            <input id="trained" type="checkbox">
-            <span>今天有训练</span>
+          <label>
+            散步分钟
+            <input id="walkMinutes" type="number" min="0" step="1" value="0">
           </label>
 
           <label>
@@ -118,6 +175,40 @@
           </label>
 
           <label>
+            训练时长（分钟）
+            <input id="trainingMinutes" type="number" min="0" step="1" value="0">
+          </label>
+
+          <label>
+            训练完成度
+            <select id="trainingCompletion">
+              <option value="未训练">未训练</option>
+              <option value="部分">部分完成</option>
+              <option value="完整">完整完成</option>
+            </select>
+          </label>
+
+          <label>
+            训练强度 RPE
+            <select id="trainingRpe">
+              <option value="0">未训练</option>
+              <option value="3">3 - 很轻松</option>
+              <option value="4">4 - 轻松</option>
+              <option value="5">5 - 中等</option>
+              <option value="6">6 - 稍有挑战</option>
+              <option value="7">7 - 较有挑战</option>
+              <option value="8">8 - 较困难</option>
+              <option value="9">9 - 很困难</option>
+              <option value="10">10 - 极限</option>
+            </select>
+          </label>
+
+          <label class="checkbox-row">
+            <input id="warmupCooldown" type="checkbox">
+            <span>已完成热身和拉伸</span>
+          </label>
+
+          <label>
             晚饭类型
             <select id="dinnerType">
               <option value="清淡">清淡</option>
@@ -127,6 +218,29 @@
               <option value="拉面">拉面</option>
               <option value="其他">其他</option>
             </select>
+          </label>
+
+          <label>
+            晚饭质量
+            <select id="dinnerQuality">
+              <option value="健康">健康</option>
+              <option value="普通">普通</option>
+              <option value="放纵">放纵</option>
+            </select>
+          </label>
+
+          <label>
+            今日疲劳
+            <select id="fatigue">
+              <option value="低">低</option>
+              <option value="中">中</option>
+              <option value="高">高</option>
+            </select>
+          </label>
+
+          <label>
+            酸痛部位
+            <input id="soreness" type="text" placeholder="例如：大腿、肩背；没有可留空">
           </label>
 
           <label class="wide">
@@ -155,6 +269,7 @@
                 <th>步数</th>
                 <th>训练</th>
                 <th>训练类型</th>
+                <th>训练详情</th>
                 <th>晚饭</th>
                 <th>备注</th>
                 <th>操作</th>
@@ -174,6 +289,7 @@
     <script src="js/stats.js"></script>
     <script src="js/recommendation-plans.js"></script>
     <script src="js/recommendation-engine.js"></script>
+    <script src="js/rpg.js"></script>
     <script src="js/ai-client.js"></script>
     <script src="js/ui.js"></script>
     <script src="app.js"></script>
