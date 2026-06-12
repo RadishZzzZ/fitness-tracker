@@ -1,0 +1,9 @@
+{
+  "name": "local-fitness-tracker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "本地健身记录小工具，支持可选本机 AI 代理。",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
