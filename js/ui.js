@@ -42,18 +42,31 @@
     aiStatus: document.querySelector("#aiStatus"),
     aiAdvice: document.querySelector("#aiAdvice"),
     levelValue: document.querySelector("#levelValue"),
+    titleValue: document.querySelector("#titleValue"),
     expValue: document.querySelector("#expValue"),
     remainingExpValue: document.querySelector("#remainingExpValue"),
     expProgress: document.querySelector("#expProgress"),
     expProgressBar: document.querySelector("#expProgressBar"),
     streakValue: document.querySelector("#streakValue"),
+    recoveryTokenValue: document.querySelector("#recoveryTokenValue"),
+    nextUnlockValue: document.querySelector("#nextUnlockValue"),
     habitRecommendation: document.querySelector("#habitRecommendation"),
     dailyTaskProgress: document.querySelector("#dailyTaskProgress"),
     dailyTaskList: document.querySelector("#dailyTaskList"),
     taskRewardMessage: document.querySelector("#taskRewardMessage"),
     recentTaskCount: document.querySelector("#recentTaskCount"),
     recentExpCount: document.querySelector("#recentExpCount"),
-    recentExerciseCount: document.querySelector("#recentExerciseCount")
+    recentExerciseCount: document.querySelector("#recentExerciseCount"),
+    weeklyChallengeName: document.querySelector("#weeklyChallengeName"),
+    weeklyChallengeDescription: document.querySelector("#weeklyChallengeDescription"),
+    weeklyChallengeProgress: document.querySelector("#weeklyChallengeProgress"),
+    weeklyChallengeState: document.querySelector("#weeklyChallengeState"),
+    weeklyChallengeReward: document.querySelector("#weeklyChallengeReward"),
+    levelUpDialog: document.querySelector("#levelUpDialog"),
+    levelUpTitle: document.querySelector("#levelUpTitle"),
+    levelUpMessage: document.querySelector("#levelUpMessage"),
+    levelUpRewards: document.querySelector("#levelUpRewards"),
+    closeLevelUpButton: document.querySelector("#closeLevelUpButton")
   };
 
   let records = [];
@@ -70,6 +83,7 @@
   }
 
   function reconcileExistingRecords() {
+    const previousLevel = app.rpg.getLevelProgress(rpgState.totalExp).level;
     // 旧版记录加载后也按新规则结算一次；已完成任务不会重复获得经验。
     [...records]
       .sort((a, b) => a.date.localeCompare(b.date))
@@ -77,6 +91,9 @@
         app.rpg.settleTasksFromRecord(rpgState, record, records);
       });
 
+    app.rpg.applyStreakProtection(rpgState);
+    app.rpg.settleWeeklyChallenge(rpgState);
+    app.rpg.processLevelRewards(rpgState, previousLevel);
     app.storage.saveRecords(records);
     app.storage.saveRpgState(rpgState);
   }
@@ -98,6 +115,9 @@
     elements.historyBody.addEventListener("click", handleHistoryClick);
     elements.aiRecommendButton.addEventListener("click", handleAiRecommendation);
     elements.dailyTaskList.addEventListener("click", handleDailyTaskClick);
+    elements.closeLevelUpButton.addEventListener("click", () => {
+      elements.levelUpDialog.close();
+    });
   }
 
   function render() {
@@ -115,12 +135,16 @@
     const recentStats = app.rpg.getRecentSevenDayStats(rpgState);
 
     elements.levelValue.textContent = `Lv. ${level.level}`;
+    elements.titleValue.textContent = app.rpg.getTitle(level.level);
     elements.expValue.textContent = `${level.expInLevel} / ${level.requiredExp} exp`;
     elements.remainingExpValue.textContent = `还差 ${level.remainingExp} exp`;
     elements.expProgressBar.style.width = `${level.progressPercent}%`;
     elements.expProgress.setAttribute("aria-valuemax", String(level.requiredExp));
     elements.expProgress.setAttribute("aria-valuenow", String(level.expInLevel));
     elements.streakValue.textContent = `连续 ${app.rpg.getStreak(rpgState)} 天`;
+    elements.recoveryTokenValue.textContent = `${rpgState.recoveryTokens} 张`;
+    const nextUnlock = app.rpg.getNextUnlock(level.level);
+    elements.nextUnlockValue.textContent = `Lv. ${nextUnlock.level}：${nextUnlock.text}`;
     elements.dailyTaskProgress.textContent = `${completedIds.length} / ${app.config.dailyTasks.length} 完成`;
     elements.recentTaskCount.textContent = `${recentStats.completedTasks} 个`;
     elements.recentExpCount.textContent = `${recentStats.earnedExp} exp`;
@@ -128,7 +152,27 @@
     elements.habitRecommendation.textContent = app.rpg.getHabitRecommendation(recentStats);
 
     renderDailyTasks(today, trainingTarget);
+    renderWeeklyChallenge(level.level);
     app.storage.saveRpgState(rpgState);
+  }
+
+  function renderWeeklyChallenge(level) {
+    const challenge = app.rpg.getWeeklyChallengeStatus(rpgState, level);
+    elements.weeklyChallengeName.textContent = challenge.title;
+    elements.weeklyChallengeDescription.textContent = challenge.description;
+    elements.weeklyChallengeProgress.textContent = challenge.progressText;
+
+    if (challenge.locked) {
+      elements.weeklyChallengeReward.textContent = "";
+      elements.weeklyChallengeState.textContent = `Lv. ${challenge.unlockLevel} 解锁`;
+    } else {
+      elements.weeklyChallengeReward.textContent = `完成奖励 +${challenge.rewardExp} exp`;
+      elements.weeklyChallengeState.textContent = challenge.rewarded
+        ? "已领取"
+        : challenge.completed
+          ? "待结算"
+          : "进行中";
+    }
   }
 
   function renderDailyTasks(today, trainingTarget) {
@@ -303,12 +347,17 @@
       records[existingIndex] = record;
     }
 
+    const previousLevel = app.rpg.getLevelProgress(rpgState.totalExp).level;
     app.storage.saveRecords(records);
     const completedTasks = app.rpg.settleTasksFromRecord(rpgState, record, records);
+    const protectedDate = app.rpg.applyStreakProtection(rpgState);
+    const completedChallenge = app.rpg.settleWeeklyChallenge(rpgState);
+    const levelResult = app.rpg.processLevelRewards(rpgState, previousLevel);
     app.storage.saveRpgState(rpgState);
-    showTaskRewards(completedTasks);
+    showTaskRewards(completedTasks, completedChallenge, protectedDate);
     resetForm();
     render();
+    showLevelUp(levelResult);
   }
 
   function editRecord(id) {
@@ -466,16 +515,72 @@
     return "普通";
   }
 
-  function showTaskRewards(tasks) {
-    if (!tasks.length) {
+  function showTaskRewards(tasks, challenge, protectedDate) {
+    if (!tasks.length && !challenge && !protectedDate) {
       elements.taskRewardMessage.classList.add("hidden");
       elements.taskRewardMessage.textContent = "";
       return;
     }
 
     const total = tasks.reduce((sum, task) => sum + task.exp, 0);
-    elements.taskRewardMessage.textContent = `自动完成 ${tasks.length} 个任务，获得 ${total} exp。`;
+    const messages = [];
+    if (tasks.length) {
+      messages.push(`自动完成 ${tasks.length} 个任务，获得 ${total} exp`);
+    }
+    if (challenge) {
+      messages.push(`完成周挑战“${challenge.title}”，获得 ${challenge.rewardExp} exp`);
+    }
+    if (protectedDate) {
+      messages.push(`已使用 1 张保护券守住 ${protectedDate} 的连续打卡`);
+    }
+    elements.taskRewardMessage.textContent = `${messages.join("；")}。`;
     elements.taskRewardMessage.classList.remove("hidden");
+  }
+
+  function showLevelUp(result) {
+    if (!result.leveledUp) {
+      return;
+    }
+
+    const title = app.rpg.getTitle(result.currentLevel);
+    const unlock = app.rpg.getNextUnlock(result.currentLevel);
+    elements.levelUpTitle.textContent = `达到 Lv. ${result.currentLevel}`;
+    elements.levelUpMessage.textContent = `当前称号：${title}`;
+    elements.levelUpRewards.innerHTML = "";
+
+    for (let level = result.previousLevel + 1; level <= result.currentLevel; level += 1) {
+      const unlockedText = getUnlockedAtLevel(level);
+      if (unlockedText) {
+        appendLevelReward(unlockedText);
+      }
+    }
+    result.newMilestones.forEach(() => {
+      appendLevelReward("获得 1 张连续打卡保护券");
+    });
+    appendLevelReward(`下一目标：Lv. ${unlock.level}，${unlock.text}`);
+
+    if (typeof elements.levelUpDialog.showModal === "function") {
+      elements.levelUpDialog.showModal();
+    } else {
+      elements.levelUpDialog.setAttribute("open", "");
+    }
+  }
+
+  function appendLevelReward(text) {
+    const li = document.createElement("li");
+    li.textContent = text;
+    elements.levelUpRewards.appendChild(li);
+  }
+
+  function getUnlockedAtLevel(level) {
+    const unlocks = {
+      2: "解锁周挑战“步行探索”",
+      3: "解锁周挑战“力量基础”",
+      5: "获得称号“稳定训练者”，解锁“均衡一周”",
+      8: "获得称号“恢复管理者”，解锁“恢复管理”",
+      10: "获得称号“长期主义者”"
+    };
+    return unlocks[level] || "";
   }
 
   app.ui = {

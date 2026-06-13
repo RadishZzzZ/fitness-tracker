@@ -3,14 +3,24 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#173f35">
     <title>健身生活 RPG</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png">
+    <link rel="apple-touch-icon" href="assets/icons/app-icon-192.png">
+    <link rel="manifest" href="manifest.webmanifest">
     <link rel="stylesheet" href="style.css">
   </head>
   <body>
     <header class="app-header">
-      <div>
-        <h1>健身生活 RPG</h1>
-        <p>完成每日任务，积累经验，同时记录训练和生活习惯。</p>
+      <div class="header-content">
+        <img class="app-logo" src="assets/icons/app-icon-192.png" alt="">
+        <div class="header-copy">
+          <h1>健身生活 RPG</h1>
+          <p>完成每日任务，积累经验，同时记录训练和生活习惯。</p>
+        </div>
+        <button id="installAppButton" class="install-button hidden" type="button">
+          安装到桌面
+        </button>
       </div>
     </header>
 
@@ -26,12 +36,20 @@
             <strong id="levelValue">Lv. 1</strong>
           </div>
           <div>
+            <span>称号</span>
+            <strong id="titleValue">起步者</strong>
+          </div>
+          <div>
             <span>当前经验</span>
             <strong id="expValue">0 / 100 exp</strong>
           </div>
           <div>
             <span>距离升级</span>
             <strong id="remainingExpValue">还差 100 exp</strong>
+          </div>
+          <div>
+            <span>打卡保护券</span>
+            <strong id="recoveryTokenValue">0 张</strong>
           </div>
         </div>
         <div
@@ -45,7 +63,21 @@
         >
           <div id="expProgressBar" class="exp-progress-bar"></div>
         </div>
+        <p id="nextUnlockValue" class="next-unlock"></p>
         <p id="habitRecommendation" class="habit-recommendation"></p>
+      </section>
+
+      <section class="panel weekly-challenge-panel" aria-labelledby="weekly-challenge-title">
+        <div class="section-title">
+          <h2 id="weekly-challenge-title">本周挑战</h2>
+          <span id="weeklyChallengeReward" class="muted"></span>
+        </div>
+        <strong id="weeklyChallengeName" class="weekly-challenge-name"></strong>
+        <p id="weeklyChallengeDescription"></p>
+        <div class="weekly-challenge-progress">
+          <span id="weeklyChallengeProgress"></span>
+          <strong id="weeklyChallengeState"></strong>
+        </div>
       </section>
 
       <section class="panel" aria-labelledby="daily-task-title">
@@ -283,6 +315,16 @@
       </section>
     </main>
 
+    <dialog id="levelUpDialog" class="level-up-dialog">
+      <div class="level-up-content">
+        <span class="level-up-label">等级提升</span>
+        <h2 id="levelUpTitle">达到 Lv. 2</h2>
+        <p id="levelUpMessage"></p>
+        <ul id="levelUpRewards"></ul>
+        <button id="closeLevelUpButton" type="button">继续</button>
+      </div>
+    </dialog>
+
     <script src="js/config.js"></script>
     <script src="js/date-utils.js"></script>
     <script src="js/storage.js"></script>
@@ -291,6 +333,7 @@
     <script src="js/recommendation-engine.js"></script>
     <script src="js/rpg.js"></script>
     <script src="js/ai-client.js"></script>
+    <script src="js/pwa.js"></script>
     <script src="js/ui.js"></script>
     <script src="app.js"></script>
   </body>

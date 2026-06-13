@@ -21,6 +21,75 @@
     };
   }
 
+  const titles = [
+    { level: 1, name: "起步者" },
+    { level: 2, name: "行动者" },
+    { level: 3, name: "规律建立者" },
+    { level: 5, name: "稳定训练者" },
+    { level: 8, name: "恢复管理者" },
+    { level: 10, name: "长期主义者" }
+  ];
+
+  const weeklyChallenges = [
+    {
+      level: 2,
+      id: "walking",
+      title: "步行探索",
+      description: "本周完成 3 次散步任务",
+      rewardExp: 60
+    },
+    {
+      level: 3,
+      id: "strength",
+      title: "力量基础",
+      description: "本周完成 2 次力量训练任务",
+      rewardExp: 80
+    },
+    {
+      level: 5,
+      id: "balanced",
+      title: "均衡一周",
+      description: "本周完成 3 次散步、2 次力量训练和 3 次健康晚餐",
+      rewardExp: 120
+    },
+    {
+      level: 8,
+      id: "recovery",
+      title: "恢复管理",
+      description: "本周完成 3 次热身拉伸和 3 次散步",
+      rewardExp: 140
+    }
+  ];
+
+  function getTitle(level) {
+    return [...titles].reverse().find((item) => level >= item.level).name;
+  }
+
+  function getNextUnlock(level) {
+    const nextChallenge = weeklyChallenges.find((challenge) => challenge.level > level);
+    const nextTitle = titles.find((title) => title.level > level);
+    const candidates = [];
+
+    if (nextChallenge) {
+      candidates.push({
+        level: nextChallenge.level,
+        text: `解锁周挑战“${nextChallenge.title}”`
+      });
+    }
+    if (nextTitle) {
+      candidates.push({
+        level: nextTitle.level,
+        text: `获得称号“${nextTitle.name}”`
+      });
+    }
+
+    candidates.sort((a, b) => a.level - b.level);
+    return candidates[0] || {
+      level: level + 1,
+      text: "继续积累经验和稳定习惯"
+    };
+  }
+
   function getCompletedTaskIds(state, date) {
     const day = state.taskHistory[date];
     const completedIds = day && Array.isArray(day.completedTaskIds) ? day.completedTaskIds : [];
@@ -152,6 +221,32 @@
     return newlyCompleted;
   }
 
+  function processLevelRewards(state, previousLevel) {
+    const currentLevel = getLevelProgress(state.totalExp).level;
+    const newMilestones = [];
+    state.rewardedMilestones = Array.isArray(state.rewardedMilestones)
+      ? state.rewardedMilestones
+      : [];
+    state.recoveryTokens = Number.isFinite(state.recoveryTokens) ? state.recoveryTokens : 0;
+
+    // 每达到 5 的倍数等级，发放一张连续打卡保护券。
+    for (let milestone = 5; milestone <= currentLevel; milestone += 5) {
+      if (!state.rewardedMilestones.includes(milestone)) {
+        state.rewardedMilestones.push(milestone);
+        state.recoveryTokens += 1;
+        newMilestones.push(milestone);
+      }
+    }
+
+    state.highestLevelSeen = Math.max(state.highestLevelSeen || 1, currentLevel);
+    return {
+      leveledUp: currentLevel > previousLevel,
+      previousLevel,
+      currentLevel,
+      newMilestones
+    };
+  }
+
   function getDateOffset(daysAgo) {
     const date = new Date();
     date.setDate(date.getDate() - daysAgo);
@@ -164,12 +259,44 @@
     let streak = 0;
 
     // 今天还没完成任务时，昨天的连续记录仍然有效；若昨天也空缺则归零。
-    while (getCompletedTaskIds(state, getDateOffset(offset)).length > 0) {
+    while (isActiveStreakDate(state, getDateOffset(offset))) {
       streak += 1;
       offset += 1;
     }
 
     return streak;
+  }
+
+  function isActiveStreakDate(state, date) {
+    return (
+      getCompletedTaskIds(state, date).length > 0
+      || (Array.isArray(state.protectedDates) && state.protectedDates.includes(date))
+    );
+  }
+
+  function applyStreakProtection(state) {
+    state.protectedDates = Array.isArray(state.protectedDates) ? state.protectedDates : [];
+    const today = app.dateUtils.todayString();
+    if (getCompletedTaskIds(state, today).length === 0 || state.recoveryTokens <= 0) {
+      return "";
+    }
+
+    const yesterday = app.dateUtils.previousDateString(today);
+    const dayBeforeYesterday = app.dateUtils.previousDateString(yesterday);
+    const missedYesterday = getCompletedTaskIds(state, yesterday).length === 0;
+    const hadPreviousStreak = isActiveStreakDate(state, dayBeforeYesterday);
+
+    if (
+      missedYesterday
+      && hadPreviousStreak
+      && !state.protectedDates.includes(yesterday)
+    ) {
+      state.protectedDates.push(yesterday);
+      state.recoveryTokens -= 1;
+      return yesterday;
+    }
+
+    return "";
   }
 
   function getRecentSevenDayStats(state) {
@@ -226,16 +353,138 @@
     return "最近 7 天整体完成得很好，继续保持现在的节奏。";
   }
 
+  function getWeekDates() {
+    const today = new Date();
+    const day = today.getDay();
+    const mondayOffset = day === 0 ? -6 : 1 - day;
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + mondayOffset);
+
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(monday);
+      date.setDate(monday.getDate() + index);
+      return app.dateUtils.formatDate(date);
+    });
+  }
+
+  function getWeekKey() {
+    return getWeekDates()[0];
+  }
+
+  function getCurrentChallenge(level) {
+    return [...weeklyChallenges].reverse().find((challenge) => level >= challenge.level) || null;
+  }
+
+  function getWeeklyChallengeStatus(state, level) {
+    const challenge = getCurrentChallenge(level);
+    if (!challenge) {
+      return {
+        locked: true,
+        unlockLevel: 2,
+        title: "周挑战尚未解锁",
+        description: "达到 Lv. 2 后解锁第一个周挑战。",
+        rewardExp: 0,
+        completed: false,
+        progressText: "未解锁"
+      };
+    }
+
+    const dates = getWeekDates();
+    const counts = {
+      walk: 0,
+      strength: 0,
+      healthyDinner: 0,
+      warmupCooldown: 0
+    };
+
+    dates.forEach((date) => {
+      const ids = getCompletedTaskIds(state, date);
+      if (ids.includes("walk")) {
+        counts.walk += 1;
+      }
+      if (ids.includes("healthyDinner")) {
+        counts.healthyDinner += 1;
+      }
+      if (ids.includes("warmupCooldown")) {
+        counts.warmupCooldown += 1;
+      }
+      if (
+        ids.includes("dynamicTraining")
+        && state.taskHistory[date]
+        && state.taskHistory[date].trainingTarget !== "轻恢复"
+      ) {
+        counts.strength += 1;
+      }
+    });
+
+    let completed = false;
+    let progressText = "";
+    if (challenge.id === "walking") {
+      completed = counts.walk >= 3;
+      progressText = `${Math.min(counts.walk, 3)} / 3 次散步`;
+    } else if (challenge.id === "strength") {
+      completed = counts.strength >= 2;
+      progressText = `${Math.min(counts.strength, 2)} / 2 次力量训练`;
+    } else if (challenge.id === "balanced") {
+      completed = counts.walk >= 3 && counts.strength >= 2 && counts.healthyDinner >= 3;
+      progressText = `散步 ${Math.min(counts.walk, 3)}/3 · 力量 ${Math.min(counts.strength, 2)}/2 · 晚餐 ${Math.min(counts.healthyDinner, 3)}/3`;
+    } else {
+      completed = counts.warmupCooldown >= 3 && counts.walk >= 3;
+      progressText = `热身拉伸 ${Math.min(counts.warmupCooldown, 3)}/3 · 散步 ${Math.min(counts.walk, 3)}/3`;
+    }
+
+    const weekKey = getWeekKey();
+    state.weeklyRewards = state.weeklyRewards && typeof state.weeklyRewards === "object"
+      ? state.weeklyRewards
+      : {};
+    const rewardedIds = Array.isArray(state.weeklyRewards[weekKey])
+      ? state.weeklyRewards[weekKey]
+      : [];
+
+    return {
+      ...challenge,
+      locked: false,
+      completed,
+      rewarded: rewardedIds.includes(challenge.id),
+      progressText,
+      weekKey
+    };
+  }
+
+  function settleWeeklyChallenge(state) {
+    state.weeklyRewards = state.weeklyRewards && typeof state.weeklyRewards === "object"
+      ? state.weeklyRewards
+      : {};
+    const level = getLevelProgress(state.totalExp).level;
+    const status = getWeeklyChallengeStatus(state, level);
+    if (status.locked || !status.completed || status.rewarded) {
+      return null;
+    }
+
+    if (!Array.isArray(state.weeklyRewards[status.weekKey])) {
+      state.weeklyRewards[status.weekKey] = [];
+    }
+    state.weeklyRewards[status.weekKey].push(status.id);
+    state.totalExp += status.rewardExp;
+    return status;
+  }
+
   app.rpg = {
     getLevelProgress,
+    getTitle,
+    getNextUnlock,
     getCompletedTaskIds,
     ensureDay,
     isTaskCompleted,
     completeTask,
     getTrainingTarget,
     settleTasksFromRecord,
+    processLevelRewards,
     getStreak,
+    applyStreakProtection,
     getRecentSevenDayStats,
-    getHabitRecommendation
+    getHabitRecommendation,
+    getWeeklyChallengeStatus,
+    settleWeeklyChallenge
   };
 })();

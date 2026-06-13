@@ -48,20 +48,67 @@
     try {
       const raw = localStorage.getItem(app.config.rpgStorageKey);
       if (!raw) {
-        return { totalExp: 0, taskHistory: {} };
+        return createInitialRpgState();
       }
 
       const state = JSON.parse(raw);
+      const totalExp = Number.isFinite(state.totalExp) ? state.totalExp : 0;
+      const currentLevel = calculateLevel(totalExp);
+      const rewardedMilestones = Array.isArray(state.rewardedMilestones)
+        ? state.rewardedMilestones
+        : getReachedMilestones(currentLevel);
+
       return {
-        totalExp: Number.isFinite(state.totalExp) ? state.totalExp : 0,
+        totalExp,
         taskHistory: state.taskHistory && typeof state.taskHistory === "object"
           ? state.taskHistory
+          : {},
+        highestLevelSeen: Number.isFinite(state.highestLevelSeen)
+          ? state.highestLevelSeen
+          : currentLevel,
+        recoveryTokens: Number.isFinite(state.recoveryTokens)
+          ? state.recoveryTokens
+          : rewardedMilestones.length,
+        rewardedMilestones,
+        protectedDates: Array.isArray(state.protectedDates) ? state.protectedDates : [],
+        weeklyRewards: state.weeklyRewards && typeof state.weeklyRewards === "object"
+          ? state.weeklyRewards
           : {}
       };
     } catch (error) {
       console.warn("读取 RPG 状态失败，已使用初始状态。", error);
-      return { totalExp: 0, taskHistory: {} };
+      return createInitialRpgState();
     }
+  }
+
+  function createInitialRpgState() {
+    return {
+      totalExp: 0,
+      taskHistory: {},
+      highestLevelSeen: 1,
+      recoveryTokens: 0,
+      rewardedMilestones: [],
+      protectedDates: [],
+      weeklyRewards: {}
+    };
+  }
+
+  function calculateLevel(totalExp) {
+    let level = 1;
+    let remaining = Math.max(0, totalExp);
+    while (remaining >= level * 100) {
+      remaining -= level * 100;
+      level += 1;
+    }
+    return level;
+  }
+
+  function getReachedMilestones(level) {
+    const milestones = [];
+    for (let milestone = 5; milestone <= level; milestone += 5) {
+      milestones.push(milestone);
+    }
+    return milestones;
   }
 
   function saveRpgState(state) {
