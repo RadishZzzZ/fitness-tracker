@@ -113,6 +113,7 @@
     if (!Number.isFinite(day.expEarned)) {
       day.expEarned = 0;
     }
+    day.trainingTarget = normalizeTrainingTarget(day.trainingTarget);
     return day;
   }
 
@@ -150,25 +151,58 @@
     if (
       yesterday
       && yesterday.trainingCompletion === "完整"
-      && app.config.fullTrainingTypes.includes(yesterday.trainingType)
+      && isStrengthRecord(yesterday)
     ) {
-      day.trainingTarget = "轻恢复";
+      day.trainingTarget = "lightRecovery";
       return day.trainingTarget;
     }
 
     const lastStrength = earlierRecords.find(
-      (record) => app.config.fullTrainingTypes.includes(record.trainingType)
+      (record) => isStrengthRecord(record)
     );
 
-    if (lastStrength && lastStrength.trainingType === "上半身") {
-      day.trainingTarget = "下半身";
-    } else if (lastStrength && lastStrength.trainingType === "下半身") {
-      day.trainingTarget = "上半身";
+    if (lastStrength && ["upper", "push", "pull", "core"].includes(lastStrength.trainingFocus)) {
+      day.trainingTarget = "lower";
+    } else if (lastStrength && ["lower", "glutesLegs"].includes(lastStrength.trainingFocus)) {
+      day.trainingTarget = "upper";
     } else {
-      day.trainingTarget = "全身";
+      day.trainingTarget = "full";
     }
 
     return day.trainingTarget;
+  }
+
+  function normalizeTrainingTarget(target) {
+    const legacyMap = {
+      轻恢复: "lightRecovery",
+      散步: "walk",
+      上半身: "upper",
+      下半身: "lower",
+      全身: "full",
+      休息: "rest"
+    };
+    return legacyMap[target] || target || "";
+  }
+
+  function isStrengthRecord(record) {
+    return (
+      record.trainingCategory === "strength"
+      || app.config.strengthFocusIds.includes(record.trainingFocus)
+      || app.config.fullTrainingTypes.includes(record.trainingType)
+    );
+  }
+
+  function isRecoveryTarget(target) {
+    return target === "lightRecovery" || target === "walk";
+  }
+
+  function isRecoveryRecord(record) {
+    return (
+      record.trainingCategory === "recovery"
+      || app.config.recoveryFocusIds.includes(record.trainingFocus)
+      || record.trainingFocus === "walk"
+      || ["轻恢复", "散步"].includes(record.trainingType)
+    );
   }
 
   function taskMatchesRecord(taskId, record, trainingTarget) {
@@ -185,14 +219,14 @@
       return record.dinnerQuality === "健康";
     }
     if (taskId === "dynamicTraining") {
-      if (trainingTarget === "轻恢复") {
+      if (isRecoveryTarget(trainingTarget)) {
         return (
-          ["轻恢复", "散步"].includes(record.trainingType)
+          isRecoveryRecord(record)
           && record.trainingCompletion === "完整"
         );
       }
       return (
-        record.trainingType === trainingTarget
+        record.trainingFocus === trainingTarget
         && record.trainingCompletion === "完整"
       );
     }
@@ -323,7 +357,7 @@
           if (
             taskId === "dynamicTraining"
             && state.taskHistory[date]
-            && state.taskHistory[date].trainingTarget !== "轻恢复"
+            && !isRecoveryTarget(normalizeTrainingTarget(state.taskHistory[date].trainingTarget))
           ) {
             strengthTrainingTasks += 1;
           }
@@ -411,7 +445,7 @@
       if (
         ids.includes("dynamicTraining")
         && state.taskHistory[date]
-        && state.taskHistory[date].trainingTarget !== "轻恢复"
+        && !isRecoveryTarget(normalizeTrainingTarget(state.taskHistory[date].trainingTarget))
       ) {
         counts.strength += 1;
       }

@@ -9,13 +9,14 @@
     weightInput: document.querySelector("#weight"),
     stepsInput: document.querySelector("#steps"),
     walkMinutesInput: document.querySelector("#walkMinutes"),
-    trainingTypeInput: document.querySelector("#trainingType"),
+    trainingCategoryInput: document.querySelector("#trainingCategory"),
+    trainingFocusInput: document.querySelector("#trainingFocus"),
     trainingMinutesInput: document.querySelector("#trainingMinutes"),
     trainingCompletionInput: document.querySelector("#trainingCompletion"),
     trainingRpeInput: document.querySelector("#trainingRpe"),
     warmupCooldownInput: document.querySelector("#warmupCooldown"),
-    dinnerTypeInput: document.querySelector("#dinnerType"),
     dinnerQualityInput: document.querySelector("#dinnerQuality"),
+    dinnerTagList: document.querySelector("#dinnerTagList"),
     fatigueInput: document.querySelector("#fatigue"),
     sorenessInput: document.querySelector("#soreness"),
     noteInput: document.querySelector("#note"),
@@ -77,6 +78,7 @@
     records = app.storage.loadRecords();
     rpgState = app.storage.loadRpgState();
     reconcileExistingRecords();
+    renderConfigOptions();
     resetForm();
     bindEvents();
     render();
@@ -100,8 +102,9 @@
 
   function bindEvents() {
     elements.form.addEventListener("submit", handleSubmit);
-    elements.trainingTypeInput.addEventListener("change", () => {
-      if (elements.trainingTypeInput.value === "休息") {
+    elements.trainingCategoryInput.addEventListener("change", () => {
+      renderTrainingFocusOptions(elements.trainingCategoryInput.value);
+      if (elements.trainingCategoryInput.value === "rest") {
         elements.trainingCompletionInput.value = "未训练";
         elements.trainingRpeInput.value = "0";
         elements.trainingMinutesInput.value = "0";
@@ -118,6 +121,34 @@
     elements.closeLevelUpButton.addEventListener("click", () => {
       elements.levelUpDialog.close();
     });
+  }
+
+  function renderConfigOptions() {
+    elements.trainingCategoryInput.innerHTML = app.config.trainingCategories
+      .map((item) => `<option value="${item.id}">${escapeHtml(item.label)}</option>`)
+      .join("");
+    renderTrainingFocusOptions("rest");
+
+    elements.dinnerQualityInput.innerHTML = app.config.dinnerQualities
+      .map((quality) => `<option value="${escapeHtml(quality)}">${escapeHtml(quality)}</option>`)
+      .join("");
+
+    elements.dinnerTagList.innerHTML = app.config.dinnerTags
+      .map((tag) => `
+        <label class="tag-option">
+          <input type="checkbox" name="dinnerTags" value="${escapeHtml(tag)}">
+          <span>${escapeHtml(tag)}</span>
+        </label>
+      `)
+      .join("");
+  }
+
+  function renderTrainingFocusOptions(category, selectedFocus = "") {
+    const options = app.config.trainingFocusByCategory[category] || [];
+    elements.trainingFocusInput.innerHTML = options
+      .map((item) => `<option value="${item.id}">${escapeHtml(item.label)}</option>`)
+      .join("");
+    elements.trainingFocusInput.value = selectedFocus || (options[0] ? options[0].id : "");
   }
 
   function render() {
@@ -200,16 +231,17 @@
 
   function getTaskName(task, trainingTarget) {
     if (task.id === "dynamicTraining") {
-      return `今日训练：${trainingTarget}`;
+      return `今日训练：${getTrainingFocusLabel(trainingTarget)}`;
     }
     return task.name;
   }
 
   function getTaskRequirement(task, trainingTarget) {
+    const targetLabel = getTrainingFocusLabel(trainingTarget);
     const requirements = {
       activity: "当天记录步数达到 6000",
       walk: "当天记录散步时间达到 20 分钟",
-      dynamicTraining: `训练类型为${trainingTarget}，并选择完整完成`,
+      dynamicTraining: `训练重点为${targetLabel}，并选择完整完成`,
       warmupCooldown: "在当天记录中勾选已完成热身和拉伸",
       healthyDinner: "当天晚饭质量选择健康"
     };
@@ -248,9 +280,9 @@
         <td>${record.weight.toFixed(1)} kg</td>
         <td>${record.steps.toLocaleString("zh-CN")}</td>
         <td>${record.trained ? "是" : "否"}</td>
-        <td>${escapeHtml(record.trainingType)}</td>
+        <td>${escapeHtml(formatTrainingDisplay(record))}</td>
         <td>${formatTrainingDetails(record)}</td>
-        <td>${escapeHtml(record.dinnerType)}</td>
+        <td>${escapeHtml(formatDinnerDisplay(record))}</td>
         <td class="note-cell">${escapeHtml(record.note || "")}</td>
         <td>
           <div class="action-cell">
@@ -284,7 +316,9 @@
   }
 
   function getFormRecord() {
-    const trained = elements.trainingTypeInput.value !== "休息";
+    const trainingCategory = elements.trainingCategoryInput.value;
+    const trainingFocus = elements.trainingFocusInput.value;
+    const trained = trainingCategory !== "rest";
     return {
       id: elements.recordIdInput.value || app.storage.createId(),
       date: elements.dateInput.value,
@@ -292,13 +326,15 @@
       steps: Number(elements.stepsInput.value),
       walkMinutes: Number(elements.walkMinutesInput.value),
       trained,
-      trainingType: elements.trainingTypeInput.value,
+      trainingCategory,
+      trainingFocus,
+      trainingType: getTrainingFocusLabel(trainingFocus),
       trainingMinutes: Number(elements.trainingMinutesInput.value),
       trainingCompletion: elements.trainingCompletionInput.value,
       trainingRpe: Number(elements.trainingRpeInput.value),
       warmupCooldown: elements.warmupCooldownInput.checked,
-      dinnerType: elements.dinnerTypeInput.value,
       dinnerQuality: elements.dinnerQualityInput.value,
+      dinnerTags: getSelectedDinnerTags(),
       fatigue: elements.fatigueInput.value,
       soreness: elements.sorenessInput.value.trim(),
       note: elements.noteInput.value.trim()
@@ -371,13 +407,14 @@
     elements.weightInput.value = record.weight;
     elements.stepsInput.value = record.steps;
     elements.walkMinutesInput.value = record.walkMinutes || 0;
-    elements.trainingTypeInput.value = record.trainingType;
+    elements.trainingCategoryInput.value = record.trainingCategory || "rest";
+    renderTrainingFocusOptions(elements.trainingCategoryInput.value, record.trainingFocus || "rest");
     elements.trainingMinutesInput.value = record.trainingMinutes || 0;
     elements.trainingCompletionInput.value = record.trainingCompletion || (record.trained ? "完整" : "未训练");
     elements.trainingRpeInput.value = String(record.trainingRpe || 0);
     elements.warmupCooldownInput.checked = record.warmupCooldown === true;
-    elements.dinnerTypeInput.value = record.dinnerType;
-    elements.dinnerQualityInput.value = record.dinnerQuality || inferDinnerQuality(record.dinnerType);
+    elements.dinnerQualityInput.value = record.dinnerQuality || "普通";
+    setSelectedDinnerTags(record.dinnerTags || []);
     elements.fatigueInput.value = record.fatigue || "中";
     elements.sorenessInput.value = record.soreness || "";
     elements.noteInput.value = record.note || "";
@@ -466,13 +503,15 @@
     elements.form.reset();
     elements.recordIdInput.value = "";
     elements.dateInput.value = app.dateUtils.todayString();
-    elements.trainingTypeInput.value = "休息";
+    elements.trainingCategoryInput.value = "rest";
+    renderTrainingFocusOptions("rest", "rest");
     elements.walkMinutesInput.value = "0";
     elements.trainingMinutesInput.value = "0";
     elements.trainingCompletionInput.value = "未训练";
     elements.trainingRpeInput.value = "0";
     elements.warmupCooldownInput.checked = false;
     elements.dinnerQualityInput.value = "健康";
+    setSelectedDinnerTags([]);
     elements.fatigueInput.value = "中";
     elements.formTitle.textContent = "新增记录";
     elements.submitButton.textContent = "保存记录";
@@ -505,14 +544,38 @@
     return escapeHtml(details.length ? details.join(" / ") : "暂无");
   }
 
-  function inferDinnerQuality(dinnerType) {
-    if (dinnerType === "清淡") {
-      return "健康";
-    }
-    if (app.config.heavyDinners.includes(dinnerType)) {
-      return "放纵";
-    }
-    return "普通";
+  function getTrainingCategoryLabel(categoryId) {
+    const category = app.config.trainingCategories.find((item) => item.id === categoryId);
+    return category ? category.label : "休息";
+  }
+
+  function getTrainingFocusLabel(focusId) {
+    const allOptions = Object.values(app.config.trainingFocusByCategory).flat();
+    const option = allOptions.find((item) => item.id === focusId);
+    return option ? option.label : focusId;
+  }
+
+  function formatTrainingDisplay(record) {
+    const categoryLabel = getTrainingCategoryLabel(record.trainingCategory);
+    const focusLabel = getTrainingFocusLabel(record.trainingFocus);
+    return categoryLabel === focusLabel ? categoryLabel : `${categoryLabel} / ${focusLabel}`;
+  }
+
+  function formatDinnerDisplay(record) {
+    const tags = Array.isArray(record.dinnerTags) ? record.dinnerTags : [];
+    return tags.length ? `${record.dinnerQuality} / ${tags.join("、")}` : record.dinnerQuality;
+  }
+
+  function getSelectedDinnerTags() {
+    return [...elements.dinnerTagList.querySelectorAll("input[name='dinnerTags']:checked")]
+      .map((input) => input.value);
+  }
+
+  function setSelectedDinnerTags(tags) {
+    const selected = new Set(tags);
+    elements.dinnerTagList.querySelectorAll("input[name='dinnerTags']").forEach((input) => {
+      input.checked = selected.has(input.value);
+    });
   }
 
   function showTaskRewards(tasks, challenge, protectedDate) {

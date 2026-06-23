@@ -1,4 +1,4 @@
-const CACHE_NAME = "fitness-rpg-v1";
+const CACHE_NAME = "fitness-rpg-v2";
 
 const APP_FILES = [
   "/",

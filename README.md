@@ -10,8 +10,8 @@
 
 ## 项目特点
 
-- **健身记录**：记录体重、步数、散步时间、训练类型、训练时长、完成度、RPE、疲劳和酸痛情况。
-- **饮食记录**：记录晚饭类型和晚饭质量。
+- **健身记录**：记录体重、步数、散步时间、训练大类、训练重点、训练时长、完成度、RPE、疲劳和酸痛情况。
+- **饮食记录**：记录晚饭质量和晚饭标签。
 - **每日任务**：根据当天记录自动结算任务和经验，不需要重复手动打卡。
 - **动态训练目标**：根据最近训练在上半身、下半身、全身和轻恢复之间轮换。
 - **RPG 成长**：包含等级、经验条、称号、连续打卡、升级反馈和打卡保护券。
@@ -42,7 +42,7 @@
 | --- | --- | ---: |
 | 达到 6000 步 | 当天步数不少于 6000 | 25 exp |
 | 散步 20 分钟 | 当天散步不少于 20 分钟 | 30 exp |
-| 今日动态训练 | 完整完成系统指定的训练类型 | 40 exp |
+| 今日动态训练 | 完整完成系统指定的训练重点 | 40 exp |
 | 热身和拉伸 | 在记录中勾选已完成 | 20 exp |
 | 健康晚餐 | 晚饭质量选择“健康” | 25 exp |
 
@@ -129,6 +129,15 @@ fitnessRpgState
 - `localFitnessRecords`：健身、身体状态和晚饭记录。
 - `fitnessRpgState`：经验、等级、任务历史、周挑战和保护券。
 
+当前记录模型已经把容易重复的旧字段拆开：
+
+```text
+训练：trainingCategory + trainingFocus
+晚饭：dinnerQuality + dinnerTags
+```
+
+旧版本记录中的 `trainingType` 和 `dinnerType` 仍会在读取时自动兼容，不需要手动迁移。
+
 数据与具体浏览器和访问地址绑定。例如，直接打开 `index.html` 与访问 `http://127.0.0.1:4173` 可能拥有不同的 localStorage 数据。
 
 页面中的“清空健身记录”只清空健身记录，不会删除 RPG 进度。
@@ -140,7 +149,7 @@ fitness-tracker/
 ├─ assets/icons/              # Logo、PWA 图标和 favicon
 ├─ js/
 │  ├─ ai-client.js            # 请求本机 AI 代理
-│  ├─ config.js               # 任务与应用配置
+│  ├─ config.js               # 任务、训练选项与晚饭选项
 │  ├─ date-utils.js           # 日期工具
 │  ├─ pwa.js                  # PWA 安装与 Service Worker 注册
 │  ├─ recommendation-engine.js
@@ -155,6 +164,7 @@ fitness-tracker/
 ├─ service-worker.js          # 离线缓存
 ├─ server.js                  # 本机静态服务与可选 AI 代理
 ├─ style.css                  # 页面样式
+├─ ROADMAP.md                 # 后续方向和已完成标记
 └─ package.json
 ```
 

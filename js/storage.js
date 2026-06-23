@@ -14,30 +14,97 @@
   }
 
   function normalizeRecord(record) {
-    const trained = record.trained === true || record.trainingType !== "休息";
-    let dinnerQuality = record.dinnerQuality;
-    if (!dinnerQuality) {
-      if (record.dinnerType === "清淡") {
-        dinnerQuality = "健康";
-      } else if (app.config.heavyDinners.includes(record.dinnerType)) {
-        dinnerQuality = "放纵";
-      } else {
-        dinnerQuality = "普通";
-      }
-    }
+    const training = normalizeTraining(record);
+    const trained = training.category !== "rest";
+    const dinnerQuality = normalizeDinnerQuality(record);
+    const dinnerTags = normalizeDinnerTags(record);
 
     return {
       ...record,
       walkMinutes: Number(record.walkMinutes) || 0,
       trained,
+      trainingCategory: training.category,
+      trainingFocus: training.focus,
+      trainingType: training.label,
       trainingMinutes: Number(record.trainingMinutes) || 0,
       trainingCompletion: record.trainingCompletion || (trained ? "完整" : "未训练"),
       trainingRpe: Number(record.trainingRpe) || 0,
       warmupCooldown: record.warmupCooldown === true,
       dinnerQuality,
+      dinnerTags,
       fatigue: record.fatigue || "中",
       soreness: record.soreness || ""
     };
+  }
+
+  function normalizeTraining(record) {
+    const legacyMap = {
+      休息: { category: "rest", focus: "rest" },
+      散步: { category: "cardio", focus: "walk" },
+      上半身: { category: "strength", focus: "upper" },
+      下半身: { category: "strength", focus: "lower" },
+      全身: { category: "strength", focus: "full" },
+      轻恢复: { category: "recovery", focus: "lightRecovery" }
+    };
+    const categoryIds = app.config.trainingCategories.map((item) => item.id);
+    let category = categoryIds.includes(record.trainingCategory)
+      ? record.trainingCategory
+      : "";
+    let focus = record.trainingFocus || "";
+
+    if (!category && legacyMap[record.trainingType]) {
+      category = legacyMap[record.trainingType].category;
+      focus = legacyMap[record.trainingType].focus;
+    }
+    if (!category) {
+      category = record.trained ? "strength" : "rest";
+    }
+
+    const options = app.config.trainingFocusByCategory[category] || [];
+    if (!options.some((item) => item.id === focus)) {
+      focus = options[0] ? options[0].id : "rest";
+    }
+
+    return {
+      category,
+      focus,
+      label: getTrainingFocusLabel(focus)
+    };
+  }
+
+  function getTrainingFocusLabel(focusId) {
+    const allOptions = Object.values(app.config.trainingFocusByCategory).flat();
+    const option = allOptions.find((item) => item.id === focusId);
+    return option ? option.label : "休息";
+  }
+
+  function normalizeDinnerQuality(record) {
+    if (app.config.dinnerQualities.includes(record.dinnerQuality)) {
+      return record.dinnerQuality;
+    }
+    if (record.dinnerType === "清淡") {
+      return "健康";
+    }
+    if (app.config.heavyDinners.includes(record.dinnerType)) {
+      return "放纵";
+    }
+    return "普通";
+  }
+
+  function normalizeDinnerTags(record) {
+    if (Array.isArray(record.dinnerTags)) {
+      return record.dinnerTags.filter((tag) => app.config.dinnerTags.includes(tag));
+    }
+    if (app.config.heavyDinners.includes(record.dinnerType)) {
+      return [record.dinnerType];
+    }
+    if (record.dinnerType === "清淡") {
+      return ["蔬菜足够", "主食适量"];
+    }
+    if (record.dinnerType === "其他") {
+      return ["其他"];
+    }
+    return [];
   }
 
   function saveRecords(records) {

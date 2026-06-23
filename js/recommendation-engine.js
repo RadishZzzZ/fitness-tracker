@@ -9,15 +9,15 @@
     const recentTrainingDays = recent.filter((record) => record.trained).length;
     const recentNoTrainingDays = app.stats.countRecentNoTrainingDays(sorted);
     const recentAverageSteps = app.stats.averageSteps(recent);
-    const heavyDinnerYesterday = Boolean(yesterday && app.config.heavyDinners.includes(yesterday.dinnerType));
+    const heavyDinnerYesterday = Boolean(yesterday && app.stats.hasHeavyDinner(yesterday));
     const fullTrainingYesterday = Boolean(
-      yesterday && yesterday.trained && app.config.fullTrainingTypes.includes(yesterday.trainingType)
+      yesterday && yesterday.trained && isStrengthRecord(yesterday)
     );
     const lastTraining = sorted.find(
-      (record) => record.trained && app.config.fullTrainingTypes.includes(record.trainingType)
+      (record) => record.trained && isStrengthRecord(record)
     );
-    const trainedUpperRecently = recent.some((record) => record.trainingType === "上半身");
-    const trainedLowerRecently = recent.some((record) => record.trainingType === "下半身");
+    const trainedUpperRecently = recent.some((record) => isUpperFocus(record.trainingFocus));
+    const trainedLowerRecently = recent.some((record) => isLowerFocus(record.trainingFocus));
     const reasons = [];
 
     if (!latest) {
@@ -58,13 +58,13 @@
     if (latest.steps < 6000) {
       return app.recommendationPlans.plan("coreWalk", reasons);
     }
-    if (lastTraining && lastTraining.trainingType === "上半身") {
+    if (lastTraining && isUpperFocus(lastTraining.trainingFocus)) {
       return app.recommendationPlans.plan("lowerBody", [
         ...reasons,
         "最近一次完整训练偏上半身，今天安排下半身更均衡。"
       ]);
     }
-    if (lastTraining && lastTraining.trainingType === "下半身") {
+    if (lastTraining && isLowerFocus(lastTraining.trainingFocus)) {
       return app.recommendationPlans.plan("upperBody", [
         ...reasons,
         "最近一次完整训练偏下半身，今天安排上半身更均衡。"
@@ -93,6 +93,22 @@
       "balancedFullBody",
       reasons.length ? reasons : ["当前记录比较平稳，适合做一次中等强度全身训练。"]
     );
+  }
+
+  function isStrengthRecord(record) {
+    return (
+      record.trainingCategory === "strength"
+      || app.config.strengthFocusIds.includes(record.trainingFocus)
+      || app.config.fullTrainingTypes.includes(record.trainingType)
+    );
+  }
+
+  function isUpperFocus(focus) {
+    return ["upper", "push", "pull", "core"].includes(focus);
+  }
+
+  function isLowerFocus(focus) {
+    return ["lower", "glutesLegs"].includes(focus);
   }
 
   app.recommendationEngine = {

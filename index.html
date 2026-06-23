@@ -195,15 +195,13 @@
           </label>
 
           <label>
-            训练类型
-            <select id="trainingType">
-              <option value="休息">休息</option>
-              <option value="散步">散步</option>
-              <option value="上半身">上半身</option>
-              <option value="下半身">下半身</option>
-              <option value="全身">全身</option>
-              <option value="轻恢复">轻恢复</option>
-            </select>
+            训练大类
+            <select id="trainingCategory"></select>
+          </label>
+
+          <label>
+            训练重点
+            <select id="trainingFocus"></select>
           </label>
 
           <label>
@@ -241,25 +239,14 @@
           </label>
 
           <label>
-            晚饭类型
-            <select id="dinnerType">
-              <option value="清淡">清淡</option>
-              <option value="普通">普通</option>
-              <option value="麦当劳">麦当劳</option>
-              <option value="炸物">炸物</option>
-              <option value="拉面">拉面</option>
-              <option value="其他">其他</option>
-            </select>
+            晚饭质量
+            <select id="dinnerQuality"></select>
           </label>
 
-          <label>
-            晚饭质量
-            <select id="dinnerQuality">
-              <option value="健康">健康</option>
-              <option value="普通">普通</option>
-              <option value="放纵">放纵</option>
-            </select>
-          </label>
+          <fieldset class="wide tag-fieldset">
+            <legend>晚饭标签</legend>
+            <div id="dinnerTagList" class="tag-list"></div>
+          </fieldset>
 
           <label>
             今日疲劳
@@ -300,7 +287,7 @@
                 <th>体重</th>
                 <th>步数</th>
                 <th>训练</th>
-                <th>训练类型</th>
+                <th>训练内容</th>
                 <th>训练详情</th>
                 <th>晚饭</th>
                 <th>备注</th>

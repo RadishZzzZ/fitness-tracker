@@ -43,8 +43,17 @@
       averageSteps: averageSteps(recent),
       trainingDays: recent.filter((record) => record.trained).length,
       weightChange: formatWeightChange(recent),
-      heavyDinnerCount: recent.filter((record) => app.config.heavyDinners.includes(record.dinnerType)).length
+      heavyDinnerCount: recent.filter(hasHeavyDinner).length
     };
+  }
+
+  function hasHeavyDinner(record) {
+    const tags = Array.isArray(record.dinnerTags) ? record.dinnerTags : [];
+    return (
+      app.config.heavyDinners.includes(record.dinnerType)
+      || record.dinnerQuality === "放纵"
+      || tags.some((tag) => app.config.heavyDinnerTags.includes(tag))
+    );
   }
 
   app.stats = {
@@ -52,6 +61,7 @@
     averageSteps,
     countRecentNoTrainingDays,
     formatWeightChange,
-    summarizeRecent
+    summarizeRecent,
+    hasHeavyDinner
   };
 })();

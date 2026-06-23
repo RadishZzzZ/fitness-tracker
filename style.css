@@ -576,6 +576,44 @@ textarea {
   color: var(--text);
 }
 
+.tag-fieldset {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin: 0;
+  padding: 12px;
+}
+
+.tag-fieldset legend {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+  padding: 0 6px;
+}
+
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tag-option {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text);
+  display: inline-flex;
+  font-size: 14px;
+  font-weight: 700;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 10px;
+}
+
+.tag-option input {
+  min-height: auto;
+  width: 16px;
+}
+
 .wide {
   grid-column: 1 / -1;
 }
